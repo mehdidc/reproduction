@@ -7,12 +7,8 @@
     model: !obj:pylearn2.models.mlp.MLP {
         layers: [ !obj:pylearn2.models.mlp.RectifiedLinear {
                      layer_name: 'h0',
-                     dim: 200,
-                     irange: 0.1
-                 }, !obj:pylearn2.models.mlp.RectifiedLinear {
-                     layer_name: 'h1',
-                     dim: 200,
-                     irange: 0.01
+                     dim: 1000,
+                     istdev: 0.001
                  }, !obj:pylearn2.models.mlp.Softmax {
                      layer_name: 'y',
                      n_classes: 10,
@@ -24,6 +20,15 @@
     algorithm: !obj:pylearn2.training_algorithms.sgd.SGD {
         batch_size: 100,
         learning_rate: .01,
+        cost: !obj:pylearn2.costs.cost.SumOfCosts {
+            costs: [
+                !obj:pylearn2.costs.mlp.Default {
+                },
+                !obj:pylearn2.costs.mlp.WeightDecay {
+                    coeffs: [0.0001, 0.0001]
+                }
+            ]
+        },
         monitoring_dataset:
             {
                 'train' : *train,
@@ -47,7 +52,7 @@
                     N: 10
                 },
                 !obj:pylearn2.termination_criteria.EpochCounter {
-                    max_epochs: 100
+                    max_epochs: 1000
                 }
             ]
         }
@@ -56,9 +61,9 @@
              channel_name: 'valid_y_misclass',
              save_path: "best.pkl"
         }, !obj:pylearn2.training_algorithms.learning_rule.MomentumAdjustor {
-            start: 1,
-            saturate: 50,
-            final_momentum: .99
+            start: 100,
+            saturate: 300,
+            final_momentum: .8
         }
     ]
 }
