@@ -9,5 +9,6 @@ def build_visual_model(base,
     l_input = base[input_layer_name]
     l_repr = base[repr_layer_name]
     l_hidden = DenseLayer(l_repr, num_units=size_embedding,
-                          nonlinearity=linear)
+                          nonlinearity=linear,
+                          name="embed")
     return l_input, l_hidden

@@ -8,4 +8,4 @@ def load_word_embedding(filename):
 
 
 def size_embedding(embed):
-    return len(embed.keys()[0])
+    return len(embed.keys())
