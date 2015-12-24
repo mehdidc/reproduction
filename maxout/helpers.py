@@ -1,6 +1,6 @@
 from keras.callbacks import Callback
 import numpy as np
-
+import pickle
 
 class EarlyStopping(Callback):
     def __init__(self, monitor='val_loss',
@@ -39,3 +39,18 @@ def to_attr_dict(d):
     d_ = AttrDict()
     d_.update(d)
     return d_
+
+
+class LearningRateScheduler(Callback):
+    '''Learning rate scheduler.
+    # Arguments
+        schedule: a function that gets an epoch index as input
+            (integer, indexed from 0) and returns a new
+            learning rate as output.
+    '''
+    def __init__(self, schedule):
+        super(LearningRateScheduler, self).__init__()
+        self.schedule = schedule
+
+    def on_epoch_begin(self, epoch, logs={}):
+        self.model.optimizer.lr.set_value(self.schedule(epoch, self.model.optimizer.lr.get_value()))
