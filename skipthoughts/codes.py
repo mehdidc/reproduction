@@ -80,7 +80,8 @@ class Classifier(BaseEstimator):
  
     def predict_proba(self, X):
         X = self.preprocess(X)
-        return self.net.predict_proba(X)import os
+        return self.net.predict_proba(X)
+import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
 import os
@@ -194,6 +195,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
+
 import numpy as np
 from sklearn.base import BaseEstimator
 from sklearn.ensemble import RandomForestClassifier
@@ -215,6 +217,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X_vectorized = X.reshape((X.shape[0], X.shape[1] * X.shape[2] * X.shape[3]))    
         return self.clf.predict_proba(X_vectorized)
+
 import numpy as np
 from sklearn.base import BaseEstimator
 from sklearn.ensemble import RandomForestClassifier
@@ -236,6 +239,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X_vectorized = X.reshape((X.shape[0], X.shape[1] * X.shape[2] * X.shape[3]))
         return self.clf.predict_proba(X_vectorized)
+
 import numpy as np
 from sklearn.base import BaseEstimator
 from sklearn.ensemble import RandomForestClassifier
@@ -257,6 +261,7 @@ class Classifier(BaseEstimator):
 	def predict_proba(self, X):
 	    X_vectorized = X.reshape((X.shape[0], X.shape[1] * X.shape[2] * X.shape[3]))    
 	    return self.clf.predict_proba(X_vectorized)
+
 
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
@@ -400,6 +405,7 @@ hyper_parameters = dict(
     on_epoch_finished=[EarlyStopping(patience=20, criterion='valid_accuracy', criterion_smaller_is_better=False)],
     batch_iterator_train=FlipBatchIterator(batch_size=100)
 )
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 import theano
@@ -549,6 +555,7 @@ hyper_parameters = dict(
     on_epoch_finished=[EarlyStopping(patience=20, criterion='valid_accuracy', criterion_smaller_is_better=False)],
     batch_iterator_train=FlipBatchIterator(batch_size=100)
 )
+
 
 
 import os
@@ -729,6 +736,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
@@ -812,6 +820,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
@@ -897,6 +906,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
@@ -962,6 +972,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
@@ -1026,6 +1037,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 import numpy as np
@@ -1092,7 +1104,8 @@ class Classifier(BaseEstimator):
  
     def predict_proba(self, X):
         X = self.preprocess(X)
-        return self.net.predict_proba(X)import os
+        return self.net.predict_proba(X)
+import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
 import os
@@ -1258,6 +1271,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 import theano
@@ -1413,6 +1427,7 @@ hyper_parameters = dict(
 )
 
 
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
@@ -1526,7 +1541,8 @@ class Classifier(BaseEstimator):
 
     def predict_proba(self, X):
         X = self.preprocess(X)
-        return self.net.predict_proba(X)import os
+        return self.net.predict_proba(X)
+import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
 import os
@@ -1603,7 +1619,8 @@ class Classifier(BaseEstimator):
 
     def predict_proba(self, X):
         X = self.preprocess(X)
-        return self.net.predict_proba(X)import os
+        return self.net.predict_proba(X)
+import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
 from lasagne import layers, nonlinearities
@@ -1688,6 +1705,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
@@ -1801,7 +1819,8 @@ class Classifier(BaseEstimator):
 
     def predict_proba(self, X):
         X = self.preprocess(X)
-        return self.net.predict_proba(X)import os
+        return self.net.predict_proba(X)
+import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
 from lasagne import layers, nonlinearities
@@ -1916,6 +1935,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 import theano
@@ -2026,6 +2046,7 @@ hyper_parameters = dict(
     on_epoch_finished=[EarlyStopping(patience=20, criterion='valid_accuracy', criterion_smaller_is_better=False)],
     batch_iterator_train=FlipBatchIterator(batch_size=100)
 )
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
@@ -2163,6 +2184,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
+
 
 
 import os
@@ -2304,6 +2326,7 @@ class Classifier(BaseEstimator):
         X = self.preprocess(X)
 
         return self.net.predict_proba(X)
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 
@@ -2360,6 +2383,7 @@ class Classifier(BaseEstimator):
         
     def predict_proba(self, X):
         return self.clf.predict_proba(X)
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 import theano
@@ -2458,6 +2482,7 @@ hyper_parameters = dict(
     on_epoch_finished=[EarlyStopping(patience=20, criterion='valid_accuracy', criterion_smaller_is_better=False)],
     batch_iterator_train=FlipBatchIterator(batch_size=100)
 )
+
 import numpy as np
 from sklearn.base import BaseEstimator
 from sklearn.ensemble import RandomForestClassifier
@@ -2484,6 +2509,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X_vectorized = X.reshape((X.shape[0], X.shape[1] * X.shape[2] * X.shape[3]))    
         return self.clf.predict_proba(X_vectorized)
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
@@ -2612,6 +2638,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
+
 import os
 from sklearn.base import BaseEstimator
 import os
@@ -2731,6 +2758,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
@@ -2872,7 +2900,8 @@ class Classifier(BaseEstimator):
 
     def predict_proba(self, X):
         X = self.simple_preprocess(X)
-        return self.net.predict_proba(X)import os
+        return self.net.predict_proba(X)
+import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
 import os
@@ -2963,7 +2992,8 @@ class Classifier(BaseEstimator):
 
     def predict_proba(self, X):
         X = self.preprocess(X)
-        return self.net.predict_proba(X)import os
+        return self.net.predict_proba(X)
+import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 import numpy as np
 from sklearn.base import BaseEstimator
@@ -3024,7 +3054,8 @@ class Classifier(BaseEstimator):
  
     def predict_proba(self, X):
         X = self.preprocess(X)
-        return self.net.predict_proba(X)import os
+        return self.net.predict_proba(X)
+import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 import theano
  
@@ -3169,6 +3200,7 @@ hyper_parameters = dict(
 )
 
 
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
@@ -3246,7 +3278,8 @@ class Classifier(BaseEstimator):
 
     def predict_proba(self, X):
         X = self.preprocess(X)
-        return self.net.predict_proba(X)import os
+        return self.net.predict_proba(X)
+import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 
 from sklearn.pipeline import make_pipeline
@@ -3303,6 +3336,7 @@ class Classifier(BaseEstimator):
         
     def predict_proba(self, X):
         return self.clf.predict_proba(X)
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 import theano
@@ -3384,6 +3418,7 @@ hyper_parameters = dict(
                                        criterion_smaller_is_better=False)]
 )
 
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
@@ -3449,6 +3484,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
@@ -3564,6 +3600,7 @@ class Classifier(BaseEstimator):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
 
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
@@ -3632,6 +3669,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 import theano
@@ -3725,6 +3763,7 @@ hyper_parameters = dict(
     on_epoch_finished=[EarlyStopping(patience=20, criterion='valid_accuracy', criterion_smaller_is_better=False)],
     batch_iterator_train=FlipBatchIterator(batch_size=100)
 )
+
 import numpy as np
 from sklearn.base import BaseEstimator
 from sklearn.ensemble import RandomForestClassifier
@@ -3746,6 +3785,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X_vectorized = X.reshape((X.shape[0], X.shape[1] * X.shape[2] * X.shape[3]))    
         return self.clf.predict_proba(X_vectorized)
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 import theano
@@ -3843,6 +3883,7 @@ hyper_parameters = dict(
     on_epoch_finished=[EarlyStopping(patience=20, criterion='valid_accuracy', criterion_smaller_is_better=False)],
     batch_iterator_train=FlipBatchIterator(batch_size=100)
 )
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
@@ -3934,6 +3975,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
@@ -4002,6 +4044,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
@@ -4096,7 +4139,8 @@ class Classifier(BaseEstimator):
 
     def predict_proba(self, X):
         X = self.preprocess(X)
-        return self.net.predict_proba(X)import os
+        return self.net.predict_proba(X)
+import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
 import os
@@ -4161,6 +4205,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 import theano
@@ -4309,6 +4354,7 @@ hyper_parameters = dict(
 )
 
 
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 import theano
@@ -4385,6 +4431,7 @@ hyper_parameters = dict(
     on_epoch_finished = [EarlyStopping(patience=20, criterion='valid_accuracy', 
                                        criterion_smaller_is_better=False)]
 )
+
 
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
@@ -4519,6 +4566,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
+
 
 
 import os
@@ -4656,6 +4704,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 import numpy as np
@@ -4730,6 +4779,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
@@ -4857,6 +4907,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 import theano
@@ -4933,6 +4984,7 @@ hyper_parameters = dict(
     on_epoch_finished = [EarlyStopping(patience=20, criterion='valid_accuracy', 
                                        criterion_smaller_is_better=False)]
 )
+
 
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
@@ -5099,6 +5151,7 @@ class Classifier(BaseEstimator):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
 
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 import theano
@@ -5241,6 +5294,7 @@ hyper_parameters = dict(
     on_epoch_finished=[EarlyStopping(patience=20, criterion='valid_accuracy', criterion_smaller_is_better=False)],
     batch_iterator_train=FlipBatchIterator(batch_size=100)
 )
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
@@ -5325,6 +5379,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
@@ -5484,6 +5539,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 import theano
@@ -5558,6 +5614,7 @@ hyper_parameters = dict(
     on_epoch_finished = [EarlyStopping(patience=20, criterion='valid_accuracy', 
                                        criterion_smaller_is_better=False)]
 )
+
 
 
 import os
@@ -5673,6 +5730,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 from sklearn.base import BaseEstimator
@@ -5805,6 +5863,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
+
 
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
@@ -5948,6 +6007,7 @@ hyper_parameters = dict(
     on_epoch_finished=[EarlyStopping(patience=20, criterion='valid_accuracy', criterion_smaller_is_better=False)],
     batch_iterator_train=FlipBatchIterator(batch_size=100)
 )
+
 import os
 import theano
 import theano.tensor as T
@@ -6129,6 +6189,7 @@ class Classifier(BaseEstimator):
     def predict_proba(self, X):
         X = self.preprocess(X)
         return self.net.predict_proba(X)
+
 import os
 os.environ["THEANO_FLAGS"] = "device=gpu"
 import theano
@@ -6208,4 +6269,5 @@ hyper_parameters = dict(
     on_epoch_finished = [EarlyStopping(patience=20, criterion='valid_accuracy', 
                                        criterion_smaller_is_better=False)]
 )
+
 

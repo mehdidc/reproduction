@@ -3,7 +3,15 @@ import keras.backend as K
 from keras import activations, initializations
 from keras.layers.recurrent import Recurrent
 import theano
-
+import parser
+from lasagne.layers import MergeLayer, Layer
+from lasagne.layers.recurrent import Gate
+from lasagne import init, nonlinearities
+import theano.tensor as T
+from lasagne.utils import unroll_scan
+from nltk import wordpunct_tokenize
+from contextlib import contextmanager
+from tokenize import generate_tokens
 
 class CondGRU(Recurrent):
     def __init__(self,
@@ -137,12 +145,6 @@ class CondGRU(Recurrent):
         base_config = super(CondGRU, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
-from lasagne.layers import MergeLayer, Layer, DenseLayer
-from lasagne.layers.recurrent import Gate
-from lasagne import init, nonlinearities
-import theano.tensor as T
-import theano
-from lasagne.utils import unroll_scan
 
 class CondGRULayer(MergeLayer):
     r"""
@@ -244,7 +246,6 @@ class CondGRULayer(MergeLayer):
                  incoming,
                  num_units,
                  bias,
-
                  resetgate=Gate(W_cell=None),
                  updategate=Gate(W_cell=None),
                  hidden_update=Gate(W_cell=None,
@@ -303,9 +304,10 @@ class CondGRULayer(MergeLayer):
                                    name="W_in_to_{}".format(gate_name)),
                     self.add_param(gate.W_hid, (num_units, num_units),
                                    name="W_hid_to_{}".format(gate_name)),
-                    self.add_param(gate.b, (num_units,),
-                                   name="b_{}".format(gate_name),
-                                   regularizable=False),
+                    None,
+                    #self.add_param(gate.b, (num_units,),
+                    #               name="b_{}".format(gate_name),
+                    #               regularizable=False),
                     gate.nonlinearity)
 
         # Add in all parameters from gates
@@ -398,9 +400,11 @@ class CondGRULayer(MergeLayer):
              self.W_hid_to_hidden_update], axis=1)
 
         # Stack gate biases into a (3*num_units) vector
-        b_stacked = T.concatenate(
-            [self.b_resetgate, self.b_updategate,
-             self.b_hidden_update], axis=0)
+        
+        #b_stacked = T.concatenate(
+        #    [self.b_resetgate, self.b_updategate,
+        #     self.b_hidden_update], axis=0)
+        b_stacked = None
 
         b_r = T.dot(bias, self.Cr)
         #b_r = theano.printing.Print("")(b_r)
@@ -411,7 +415,7 @@ class CondGRULayer(MergeLayer):
         if self.precompute_input:
             # precompute_input inputs*W. W_in is (n_features, 3*num_units).
             # input is then (n_batch, n_time_steps, 3*num_units).
-            input = T.dot(input, W_in_stacked) + b_stacked
+            input = T.dot(input, W_in_stacked)# + b_stacked
 
         # At each call to scan, input_n will be (n_time_steps, 3*num_units).
         # We define a slicing function that extract the input to each GRU gate
@@ -432,7 +436,7 @@ class CondGRULayer(MergeLayer):
 
             if not self.precompute_input:
                 # Compute W_{xr}x_t + b_r, W_{xu}x_t + b_u, and W_{xc}x_t + b_c
-                input_n = T.dot(input_n, W_in_stacked) + b_stacked
+                input_n = T.dot(input_n, W_in_stacked) #+ b_stacked
 
             # Reset and update gates
             resetgate = slice_w(hid_input, 0) + slice_w(input_n, 0) + b_r
@@ -524,49 +528,14 @@ class CondGRULayer(MergeLayer):
 
         return hid_out
 
+
+
 class TensorDenseLayer(Layer):
     """
-    lasagne.layers.DenseLayer(incoming, num_units,
-    W=lasagne.init.GlorotUniform(), b=lasagne.init.Constant(0.),
-    nonlinearity=lasagne.nonlinearities.rectify, **kwargs)
-
-    A fully connected layer.
-
-    Parameters
-    ----------
-    incoming : a :class:`Layer` instance or a tuple
-        The layer feeding into this layer, or the expected input shape
-
-    num_units : int
-        The number of units of the layer
-
-    W : Theano shared variable, expression, numpy array or callable
-        Initial value, expression or initializer for the weights.
-        These should be a matrix with shape ``(num_inputs, num_units)``.
-        See :func:`lasagne.utils.create_param` for more information.
-
-    b : Theano shared variable, expression, numpy array, callable or ``None``
-        Initial value, expression or initializer for the biases. If set to
-        ``None``, the layer will have no biases. Otherwise, biases should be
-        a 1D array with shape ``(num_units,)``.
-        See :func:`lasagne.utils.create_param` for more information.
-
-    nonlinearity : callable or None
-        The nonlinearity that is applied to the layer activations. If None
-        is provided, the layer will be linear.
-
-    Examples
-    --------
-    >>> from lasagne.layers import InputLayer, DenseLayer
-    >>> l_in = InputLayer((100, 20))
-    >>> l1 = DenseLayer(l_in, num_units=50)
-
-    Notes
-    -----
-    If the input to this layer has more than two axes, it will flatten the
-    trailing axes. This is useful for when a dense layer follows a
-    convolutional layer, for example. It is not necessary to insert a
-    :class:`FlattenLayer` in this case.
+    used to perform embeddings on arbitray input tensor
+    X : ([0], [1], ...,  T)
+    W : (T, E) where E is the embedding size and T is last dim input size
+    returns tensordot(X, W) + b which is : ([0], [1], ..., E)
     """
     def __init__(self, incoming, num_units, W=init.GlorotUniform(),
                  b=init.Constant(0.), nonlinearity=nonlinearities.rectify,
@@ -585,12 +554,61 @@ class TensorDenseLayer(Layer):
                                     regularizable=False)
 
     def get_output_shape_for(self, input_shape):
-        return tuple(list(input_shape[0:-1]) +  [self.num_units])
+        return input_shape[0:-1] + (self.num_units,)
 
     def get_output_for(self, input, **kwargs):
         activation = T.tensordot(input, self.W, axes=[(input.ndim - 1,), (0,)])
-        print(input.ndim, activation.ndim)
         if self.b is not None:
-            activation = activation + self.b#.dimshuffle('x', 0)
+            activation = activation + self.b
         return self.nonlinearity(activation)
 
+
+def get_tokens_from_python_code(fd):
+    for token in generate_tokens(fd.readline):
+        token_str = token[1]
+        yield token_str
+
+
+def get_tokens(fd):
+    tokens = wordpunct_tokenize(fd.read())
+    return tokens
+
+"""
+def get_tokens_from_code_batch(fd, batch_size=1):
+    stack = []
+    tokens = []
+    for line in fd.readlines():
+        stack.append(line)
+
+        if len(stack) == batch_size:
+            tokens.extend(regexp_tokenize("\n".join(stack), pattern=pattern))
+            stack = []
+    tokens.extend(regexp_tokenize("\n".join(stack), pattern=pattern))
+    return tokens
+"""
+
+def softmax(x):
+    return np.exp(x)/np.exp(x).sum(axis=-1, keepdims=True)
+
+
+def categorical_crossentropy_(p, y):
+    p = p.reshape((p.shape[0] * p.shape[1], p.shape[2]))
+    y = y.reshape((y.shape[0] * y.shape[1],))
+    l = -T.log(p[T.arange(p.shape[0]), y])
+    return l
+
+
+@contextmanager
+def character_buffered(stream):
+    """
+    Force local terminal ``stream`` be character, not line, buffered.
+    Only applies to Unix-based systems; on Windows this is a no-op.
+    """
+    import termios
+    import tty
+    old_settings = termios.tcgetattr(stream)
+    tty.setcbreak(stream)
+    try:
+        yield
+    finally:
+        termios.tcsetattr(stream, termios.TCSADRAIN, old_settings)

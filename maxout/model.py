@@ -11,9 +11,12 @@ from keras.layers.advanced_activations import LeakyReLU, PReLU
 optimization_params = dict(
         #lr=make_constant_param(0.001),
         lr=Param(initial=0.001, interval=[-4, -2], type='real', scale='log10'),
-        decay=make_constant_param(0.98),
-        momentum=make_constant_param(0.95),
+        decay=Param(initial=0.98, interval=[0.8, 1], type='real'),
+        momentum=Param(initial=0.9, interval=[0.5, 0.99], type='real'),
         patience=make_constant_param(50),
+        val_ratio=make_constant_param(0.15),
+        max_epochs=make_constant_param(500),
+        batch_size=Param(initial=128, interval=[16, 32, 64, 128, 256, 512], type='choice'),
 )
 
 
@@ -25,18 +28,18 @@ class Base(Model):
         validation_data = (self.validation_data
                            if hasattr(self, "validation_data") else None)
         if validation_data is None:
-            kwargs["validation_split"] = 0.20
+            kwargs["validation_split"] = self.val_ratio
         else:
             kwargs["validation_data"] = validation_data
         if "callbacks" in kwargs:
             kwargs["callbacks"].append(early_stopping)
         else:
             kwargs["callbacks"] = [early_stopping]
-        self.model.fit(
-            X, y,
-            nb_epoch=500,
-            show_accuracy=True,
-            **kwargs)
+        return self.model.fit(X, y,
+                              nb_epoch=self.max_epochs,
+                              batch_size=self.batch_size,
+                              show_accuracy=True,
+                              **kwargs)
 
     def predict(self, X):
         return self.model.predict_classes(X)
@@ -166,32 +169,36 @@ class ConvModel(Base):
 
 
 class Bogdan(Base):
-    params = dict()
+    params = dict(
+        nb_filters_init=Param(initial=32, interval=[8, 64], type='int'),
+        nb_units=Param(initial=625, interval=[100, 800], type='int')
+    )
     params.update(optimization_params)
 
     def build(self, nb_features=784, nb_outputs=10, imshape=None):
         assert imshape is not None
         #init = 'he_normal'
         init = 'glorot_uniform'
-        relu = LeakyReLU(alpha=0.3)
         model = Sequential()
         model.add(Reshape(imshape, input_shape=[nb_features]))
         model.add(ZeroPadding2D(padding=(1, 1)))
-        model.add(Convolution2D(32, 3, 3, init=init))
+
+        k = self.nb_filters_init
+        model.add(Convolution2D(k, 3, 3, init=init))
+        #model.add(BatchNormalization())
+        #model.add(Activation(relu))
+        model.add(PReLU())
+        model.add(MaxPooling2D((2, 2)))
+        model.add(Dropout(0.5))
+        
+        model.add(Convolution2D(k * 2, 3, 3, init=init))
         #model.add(BatchNormalization())
         #model.add(Activation(relu))
         model.add(PReLU())
         model.add(MaxPooling2D((2, 2)))
         model.add(Dropout(0.5))
 
-        model.add(Convolution2D(64, 3, 3, init=init))
-        #model.add(BatchNormalization())
-        #model.add(Activation(relu))
-        model.add(PReLU())
-        model.add(MaxPooling2D((2, 2)))
-        model.add(Dropout(0.5))
-
-        model.add(Convolution2D(128, 3, 3, init=init))
+        model.add(Convolution2D(k * 2 * 2, 3, 3, init=init))
         #model.add(BatchNormalization())
         #model.add(Activation(relu))
         model.add(PReLU())
@@ -199,7 +206,7 @@ class Bogdan(Base):
         model.add(Dropout(0.5))
 
         model.add(Flatten())
-        model.add(Dense(625, init=init))
+        model.add(Dense(self.nb_units, init=init))
         #model.add(BatchNormalization())
         #model.add(Activation(relu))
         model.add(PReLU())
