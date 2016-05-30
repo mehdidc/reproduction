@@ -64,43 +64,45 @@ def main():
     pass
 
 @click.command()
-def train():
-    T = 50
-    H = 128
-    E = 128
-    text = open("harry.txt").read()
+@click.option('--net', default='conv', help='which network to use : lstm/lstm-aa/conv', required=False)
+@click.option('--data', default='harry.txt', help='which data to use', required=False)
+def train(net, data):
+    T = 50 # max seq length
+    H = 256  # hidden layer size
+    E = 256 # embedding size
+    mode = net
+    text = open(data).read()
     sent = text
     #sent = get_tokens(text)
     #sent  = map(get_subtokens, sent)
 
     #sent = [sent[i: i + T] for i in range(0, len(sent), T)]
     sent = [sent[i: i + T] for i in range(0, len(sent))]
+    #sent = sent[0:2]
     print(sent[0])
-    #sent = sent[0:10]
 
     v = DocumentVectorizer(length=T + 1)
     X = v.fit_transform(sent)
     X = intX(X)
     D = len(v._word2int)
 
-    mode = 'conv-aa'
     if mode == 'lstm':
         # encoder
-        xcur = Input(shape=(T,))
-        xcur = Embedding(input_dim=D, output_dim=E, input_length=T)(xcur)
-        h = LSTM(H, init='orthogonal')(xcur)
-        # decoder
-        xnext = Input(shape=(T, D))
+        xcur = Input(shape=(T,), dtype='int32')
+        x = Embedding(input_dim=D, output_dim=E, input_length=T)(xcur)
+        h = SimpleRNN(H, init='orthogonal')(x)
         h = RepeatVector(T)(h)
-        x = merge([h, xnext], mode='concat')
-        x = LSTM(D, return_sequences=True)(x)
-        pre_x = x
+        # decoder
+        xnext = Input(shape=(T,), dtype='int32')
+        x = Embedding(input_dim=D, output_dim=E, input_length=T)(xnext)
+        x = merge([h, x], mode='concat')
+        x = SimpleRNN(D, init='orthogonal', return_sequences=True)(x)
         x = Activation('softmax')(x)
         outp = x
         model = Model(input=[xcur, xnext], output=outp)
     elif mode == 'lstm-aa':
-        x = Input(shape=(T,), dtype='int32', name='cur')
-        xcur = x
+        xcur = Input(shape=(T,), dtype='int32', name='cur')
+        x = xcur
         x = Embedding(input_dim=D, output_dim=E, input_length=T)(x)
         h = LSTM(H, return_sequences=True)(x)
         h = LSTM(H)(h)
@@ -126,14 +128,15 @@ def train():
         xnext = x
         model = Model(input=xcur, output=xnext)
 
-    optimizer = RMSprop(lr=0.0001, clipvalue=5, rho=0.95, epsilon=1e-8)
-
+    optimizer = RMSprop(lr=0.0001,
+                        clipvalue=200,
+                        rho=0.95,
+                        epsilon=1e-8)
     def scheduler(epoch):
-        if epoch >= 10:
-            lr = model.optimizer.lr.get_value() * 0.97
-            lr = float(lr)
-            return lr
-        return float(model.optimizer.lr.get_value())
+        lr = model.optimizer.lr.get_value() * 0.999
+        lr = float(lr)
+        model.optimizer.lr.set_value(lr)
+        return lr
 
     change_lr = LearningRateScheduler(scheduler)
 
@@ -142,13 +145,13 @@ def train():
 
     def gen(epoch):
         if mode == 'lstm':
-            j = np.random.randint(0, len(Xcur))
-            cur = Xcur[j:j + 1]
-            gen = generate_text(cur, model, v, max_length=T, rng=np.random, way='argmax', temperature=1)
-            gen = v.inverse_transform(gen)
-            gen = gen[0]
-            gen = map(lambda s:'' if s in (0, 1) else s, gen)
-            print(''.join(gen))
+            for i in range(10):
+                j = np.random.randint(0, len(Xcur))
+                cur = Xcur[j:j + 1]
+                gen = generate_text(cur, model, v, max_length=T, rng=np.random, way='argmax', temperature=2)
+                gen = gen[0]
+                gen = clean(gen)
+                print(''.join(gen))
         if mode == 'lstm-aa' or mode == 'conv-aa':
             i = np.random.randint(0, len(Xcur))
             words = Xcur_words[i:i+1]
@@ -194,23 +197,25 @@ def train():
         outp = Xnext_shifted
         pr_noise = 0
     if mode == 'lstm-aa':
-        inp = Xcur
+        inp = [Xcur]
         outp = Xnext
         pr_noise = 0
     if mode == 'conv-aa':
-        inp = Xcur
+        inp = [Xcur]
         outp = Xnext
         pr_noise = 0.3
     avg_loss = 0.
     for i in range(10000):
         nb =0
-        for x, y in iterate_minibatches(inp, outp, batchsize=128):
-            model.fit(noise(x, pr=pr_noise), categ(y, D=D), nb_epoch=1, batch_size=128, verbose=0)#, callbacks=callbacks)
-            loss = model.evaluate(x, categ(y, D=D), verbose=0)
+        for s in iterate_minibatches(len(outp), batchsize=128):
+            x_mb = [noise(x[s], pr=pr_noise) for x in inp]
+            y_mb = categ(outp[s], D=D)
+            model.fit(x_mb, y_mb, nb_epoch=1, batch_size=128, verbose=0)#, callbacks=callbacks)
+            loss = model.evaluate(x_mb, y_mb, verbose=0)
             avg_loss = avg_loss * 0.9 + loss * 0.1
             nb += 1
         print('avg loss : {}'.format(avg_loss))
-        scheduler(i)
+        #scheduler(i)
         gen(i)
 
 def categ(X, D=10):
@@ -235,8 +240,8 @@ def iterative_generation(cur, model, nb_iter=10):
         prev = cur
         cur = model.predict(cur)
         score = np.mean(cur.argmax(axis=-1) != prev.argmax(axis=-1))
-        #cur = cur.argmax(axis=-1)
-        cur = sample(cur)
+        cur = cur.argmax(axis=-1)
+        #cur = sample(cur)
         if score == 0:
             break
     return cur
@@ -247,20 +252,17 @@ def sample(X, temperature=1, rng=np.random):
         for j in range(s.shape[1]):
             pr = softmax(X[i, j] * temperature)
             s[i, j] = rng.multinomial(1, pr).argmax()
-    print(entropy(pr), -np.log(1./len(pr)))
     return s
 
 
 def generate_text(cur, model, vectorizer, max_length=10, rng=np.random, way='argmax', temperature=1):
-    nb_words = cur.shape[2]
-    gen = [[1]] * len(cur)
-    gen = vectorizer.transform(gen)
-    gen = gen[:, 0:-1, :]
-    gen = floatX(gen)
+    nb_words = len(vectorizer._word2int)
+    gen = np.ones((len(cur), max_length))
+    gen = intX(gen)
 
-    for i in range(max_length):
+    for i in range(max_length - 1):
         pre_probas = model.predict([cur, gen])
-        probas = softmax(np.log(pre_probas) * temperature)
+        probas = softmax(pre_probas * temperature)
         probas = probas[:, i, :]
         next_gen = []
         for proba in probas:
@@ -274,11 +276,8 @@ def generate_text(cur, model, vectorizer, max_length=10, rng=np.random, way='arg
                     word_idx = proba.argmax()
             else:
                 raise Exception("Wrong way : {}".format(way))
-            one_hot = [0] * nb_words
-            one_hot[word_idx] = 1.
-            next_gen.append(one_hot)
-        next_gen = floatX(next_gen)
-        gen[:, i, :] = next_gen
+            next_gen.append(word_idx)
+        gen[:, i + 1] = next_gen
     return vectorizer.inverse_transform(gen)
 
 def floatX(x):
@@ -292,17 +291,10 @@ def softmax(x):
     out = e_x / e_x.sum()
     return out
 
-def iterate_minibatches(inputs, targets, batchsize, shuffle=False):
-    assert len(inputs) == len(targets)
-    if shuffle:
-        indices = np.arange(len(inputs))
-        np.random.shuffle(indices)
-    for start_idx in range(0, len(inputs), batchsize):
-        if shuffle:
-            excerpt = indices[start_idx:start_idx + batchsize]
-        else:
-            excerpt = slice(start_idx, start_idx + batchsize)
-        yield inputs[excerpt], targets[excerpt]
+def iterate_minibatches(nb,  batchsize):
+    for start_idx in range(0, nb, batchsize):
+        S = slice(start_idx, start_idx + batchsize)
+        yield S
 
 
 main.add_command(train)
