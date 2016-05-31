@@ -1,4 +1,6 @@
 import click
+import time
+
 from keras.preprocessing import sequence
 import numpy as np
 from keras.models import Sequential
@@ -80,70 +82,90 @@ def main():
 @click.option('--granularity', default='char', help='char/word', required=False)
 @click.option('--seq_length', default=50, help='seq_length', required=False)
 @click.option('--hidden', default=256, help='hidden units number', required=False)
-def train(net, data, split, granularity, seq_length, hidden):
-
+@click.option('--seq_model', default='rnn', help='rnn/gru/lstm', required=False)
+@click.option('--nb_layers', default=1, help='nb_layers', required=False)
+@click.option('--batchsize', default=128, help='batch size', required=False)
+@click.option('--out', default='out', help='outfile', required=False)
+def train(net, data, split, granularity, seq_length, hidden, seq_model, nb_layers, batchsize, out):
     T = seq_length # max seq length
     H = hidden  # hidden layer size
     E = hidden # embedding size
-    batchsize = 128
     mode = net
     text = open(data).read()
+    assert granularity in ('char', 'word')
     if granularity == 'char':
         pass
     elif granularity == 'word':
         sent = get_tokens(text)
         sent  = map(get_subtokens, sent)
         text  = [w for s in sent for w in s]
-
+    T_ = T + 1 if mode == 'rnn_next_chars' else T
+    assert split in ('sliding_window', 'jumping_window')
     if split == 'sliding_window':
         sent = text
-        sent = [sent[i: i + T] for i in range(0, len(sent))]
+        sent = [sent[i: i + T_] for i in range(0, len(sent))]
     elif split == 'jumping_window':
         sent = text
-        sent = [sent[i: i + T] for i in range(0, len(sent), T)]
-    #sent = sent[0:256]
-
-    v = DocumentVectorizer(length=T, pad=True, begin_letter=False)
+        sent = [sent[i: i + T_] for i in range(0, len(sent), T_)]
+    v = DocumentVectorizer(length=T_, pad=True, begin_letter=False)
     X = v.fit_transform(sent)
     X = intX(X)
     D = len(v._word2int)
-    if mode == 'lstm_simple':
+    print(D)
+    SeqModel = {'rnn': SimpleRNN, 'gru': GRU, 'lstm': LSTM}[seq_model]
+
+    if mode == 'rnn_next_char':
+        # like Keras and Lasagne examples
         xcur = Input(batch_shape=(batchsize, T), dtype='int32')
         x = Embedding(input_dim=D, output_dim=E, input_length=T)(xcur)
-        h = SimpleRNN(H, stateful=True, init='orthogonal', return_sequences=True)(x)
-        h = SimpleRNN(H, init='orthogonal')(x)
+        h = x
+        for i in range(nb_layers):
+            rs = False if i == nb_layers - 1 else True
+            h = SeqModel(H, stateful=False, init='orthogonal', return_sequences=rs)(h)
         x = Dense(D)(h)
         pre_model = Model(input=xcur, output=x)
         x = Activation('softmax')(x)
         outp = x
         model = Model(input=xcur, output=outp)
-    if mode == 'lstm':
+    if mode == 'rnn_next_chars':
+        # like Karpathy's char-rnn
+        xcur = Input(batch_shape=(batchsize, T), dtype='int32')
+        x = Embedding(input_dim=D, output_dim=E, input_length=T)(xcur)
+        for i in range(nb_layers):
+            h = SeqModel(H, stateful=True, init='orthogonal', return_sequences=True)(x)
+        x = TimeDistributed(Dense(D))(h)
+        pre_model = Model(input=xcur, output=x)
+        x = Activation('softmax')(x)
+        outp = x
+        model = Model(input=xcur, output=outp)
+    if mode == 'rnn_skipthought':
+        # like skipthought ? to check
         # encoder
         xcur = Input(batch_shape=(batchsize, T), dtype='int32')
         x = Embedding(input_dim=D, output_dim=E, input_length=T)(xcur)
-        h = SimpleRNN(H, init='orthogonal', return_sequences=True, stateful=True)(x)
+        h = SeqModel(H, init='orthogonal', return_sequences=True, stateful=False)(x)
         h = RepeatVector(T)(h)
         # decoder
         xnext = Input(shape=(T,), dtype='int32')
-        x = Embedding(input_dim=D, output_dim=E, input_length=T)(xnext)
+        x = SeqModel(input_dim=D, output_dim=E, input_length=T)(xnext)
         x = merge([h, x], mode='concat')
-        x = SimpleRNN(D, init='orthogonal', return_sequences=True, stateful=True)(x)
+        x = SeqModel(D, init='orthogonal', return_sequences=True, stateful=False)(x)
         x = Activation('softmax')(x)
         outp = x
         model = Model(input=[xcur, xnext], output=outp)
-    elif mode == 'lstm-aa':
+    elif mode == 'rnn_aa':
         # like Sequence to Sequence Learning with Neural Networks
         xcur = Input(shape=(T,), dtype='int32', name='cur')
         x = xcur
         x = Embedding(input_dim=D, output_dim=E, input_length=T)(x)
-        h = SimpleRNN(H, init='orthogonal')(x)
+        h = SeqModel(H, init='orthogonal')(x)
         h = RepeatVector(T)(h)
-        h = SimpleRNN(H, init='orthogonal', return_sequences=True)(h)
+        h = SeqModel(H, init='orthogonal', return_sequences=True)(h)
         x = TimeDistributed(Dense(D))(h)
         x = Activation('softmax', name='next')(x)
         xnext  = x
         model = Model(input=xcur, output=xnext)
-    elif mode == 'conv-aa':
+    elif mode == 'conv_aa':
         x = Input(shape=(T,), dtype='int32', name='cur')
         xcur = x
         x = Embedding(input_dim=D, output_dim=D, input_length=T)(x)
@@ -162,7 +184,7 @@ def train(net, data, split, granularity, seq_length, hidden):
         x = Activation('softmax')(x)
         xnext = x
         model = Model(input=xcur, output=xnext)
-    elif mode == 'dense-aa':
+    elif mode == 'dense_aa':
         x = Input(shape=(T,), dtype='int32', name='cur')
         xcur = x
         x = Embedding(input_dim=D, output_dim=D, input_length=T)(x)
@@ -175,29 +197,41 @@ def train(net, data, split, granularity, seq_length, hidden):
         xnext = x
         model = Model(input=xcur, output=xnext)
 
-    optimizer = RMSprop(lr=0.0001, #(0.0001 for lstm_simple, 0.001 for conv-aa)
+    optimizer = RMSprop(lr=0.0001, #(0.0001 for rnn_next_char, 0.001 for conv_aa)
                         #clipvalue=5,
                         rho=0.95,
                         epsilon=1e-8)
-    def scheduler(epoch):
-        lr = model.optimizer.lr.get_value() * 0.999
-        lr = float(lr)
-        model.optimizer.lr.set_value(lr)
-        return lr
-
-    change_lr = LearningRateScheduler(scheduler)
-
     def clean(s):
         return map(lambda w:'' if w in (0, 1) else w, s)
 
     def gen(epoch):
-        if mode == 'lstm_simple':
-            # then generate
+        if mode == 'rnn_next_char':
             def pred_func(gen):
-                return model.predict([gen])
+                return pre_model.predict_on_batch([gen])
             i = np.random.randint(0, len(inp[0]))
             cur = np.repeat(inp[0][i:i+1], batchsize, axis=0)
-            gen = generate_text(pred_func, v, cur=cur, nb=batchsize, max_length=T * 4, rng=np.random, way='proba', temperature=2)
+            gen = generate_text(pred_func, v, cur=cur, nb=1, max_length=T * 100, rng=np.random, way='proba', temperature=1)
+            fd = open(out, 'a')
+            for g in gen[0:1]:
+                g = clean(g)
+                s = ''.join(g)
+                print('\n')
+                print(s)
+                print('-' * len(s))
+                print('\n')
+
+                fd.write(s)
+                fd.write('\n')
+                fd.write('-'*len(s))
+
+            fd.close()
+        if mode == 'rnn_next_chars':
+            def pred_func(gen):
+                return pre_model.predict_on_batch([gen])[:, -1, :]
+            i = np.random.randint(0, len(inp[0]))
+            cur = np.repeat(inp[0][i:i+1], batchsize, axis=0)
+            gen = generate_text(pred_func, v, cur=cur, nb=batchsize, max_length=T * 100, rng=np.random, way='proba', temperature=1)
+            fd = open(out, 'a')
             for g in gen[0:10]:
                 g = clean(g)
                 s = ''.join(g)
@@ -205,9 +239,16 @@ def train(net, data, split, granularity, seq_length, hidden):
                 print(s)
                 print('-' * len(s))
                 print('\n')
-        if mode == 'lstm':
+
+                fd.write(s)
+                fd.write('\n')
+                fd.write('-'*len(s))
+            fd.close()
+
+
+        if mode == 'rnn_skipthought':
             pass
-        if mode in ('lstm-aa', 'conv-aa', 'dense-aa'):
+        if mode in ('rnn_aa', 'conv_aa', 'dense_aa'):
             i = np.random.randint(0, len(X))
             inputs = X[i:i+1]
             preds = model.predict(X[i:i + 1])
@@ -244,38 +285,47 @@ def train(net, data, split, granularity, seq_length, hidden):
                 print('*' * len(g))
             print('\n')
 
-
-    callbacks = [change_lr, LambdaScheduler(gen)]
     model.compile(loss='categorical_crossentropy', optimizer=optimizer)
-    if mode == 'lstm':
+    if mode == 'rnn_skipthought':
         raise NotImplementedError()
-    if mode == 'lstm_simple':
+    if mode == 'rnn_next_chars':
+        inp = [X[:, 0:-1]]
+        outp = X[:, 1:]
+        pr_noise = 0
+    if mode == 'rnn_next_char':
         inp = [X[0:-1, :]]
         outp = X[1:, -1][:, None]
         pr_noise = 0
-    if mode == 'lstm-aa':
+    if mode == 'rnn_aa':
         inp = [X[0:-1, :]]
         outp = inp[0] # reverse oof the input like sequence to sequence learning with neural networks paper
         pr_noise = 0
-    if mode in ('conv-aa', 'dense-aa'):
+    if mode in ('conv_aa', 'dense_aa'):
         inp = [X[0:-1, :]]
         outp = inp[0]
         pr_noise = 0.5
-    avg_loss = 0.
+    avg_loss = -np.log(1./D)
+    nb = 0
     for i in range(10000):
-        nb =0
+        t = time.time()
         for s in iterate_minibatches(len(outp), batchsize=batchsize, exact=True):
             x_mb_orig = [x[s] for x in inp]
             x_mb = [noise(x[s], pr=pr_noise) for x in inp]
             y_mb = categ(outp[s], D=D)
             if y_mb.shape[1] == 1:
                 y_mb = y_mb[:, 0, :]
-            model.fit(x_mb, y_mb, nb_epoch=1, batch_size=batchsize, verbose=0)#, callbacks=callbacks)
+            model.fit(x_mb, y_mb, nb_epoch=1, batch_size=batchsize, verbose=0)
             loss = model.evaluate(x_mb_orig, y_mb, verbose=0, batch_size=batchsize)
-            avg_loss = avg_loss * 0.9 + loss * 0.1
+            avg_loss = avg_loss * 0.999 + loss * 0.001
             nb += 1
-        print('avg loss : {}'.format(avg_loss))
-        gen(i)
+            if nb % 10 == 0 and mode != 'rnn_next_chars':
+                gen(i)
+        print('Full data pass time in sec : {}'.format(time.time() - t))
+        print('avg loss : {}, nb updates : {}'.format(avg_loss, nb))
+        if i % 10 == 0:
+            model.reset_states()
+            gen(i)
+        model.reset_states()
 
 def categ(X, D=10):
     return np.array([to_categorical(x, nb_classes=D) for x in X])
@@ -343,7 +393,7 @@ def generate_text(pred_func, vectorizer, cur=None, nb=1, max_length=10, rng=np.r
             if way == 'argmax':
                 word_idx = word_pr.argmax()  # only take argmax
             elif way == 'proba':
-                word_idx = rng.multinomial(1, word_pr).argmax()
+                word_idx = np.random.choice(np.arange(len(word_pr)), p=word_pr)
             next_gen.append(word_idx)
         gen[:, i] = next_gen
     return vectorizer.inverse_transform(gen[:, start:])
