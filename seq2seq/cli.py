@@ -76,17 +76,19 @@ def main():
     pass
 
 @click.command()
-@click.option('--net', default='conv', help='which network to use : lstm/lstm-aa/conv', required=False)
+@click.option('--net', default='conv', help='which formulation of the problem to use : rnn_next_char/rnn_next_chars/rnn_skipthought/rnn_aa/conv_aa/dense_aa', required=False)
 @click.option('--data', default='harry.txt', help='which data to use', required=False)
-@click.option('--split', default='sliding_window', help='sliding_window', required=False)
+@click.option('--split', default='sliding_window', help='sliding_window/jumping_window', required=False)
 @click.option('--granularity', default='char', help='char/word', required=False)
-@click.option('--seq_length', default=50, help='seq_length', required=False)
+@click.option('--seq_length', default=50, help='sequence length', required=False)
 @click.option('--hidden', default=256, help='hidden units number', required=False)
 @click.option('--seq_model', default='rnn', help='rnn/gru/lstm', required=False)
 @click.option('--nb_layers', default=1, help='nb_layers', required=False)
 @click.option('--batchsize', default=128, help='batch size', required=False)
 @click.option('--out', default='out', help='outfile', required=False)
-def train(net, data, split, granularity, seq_length, hidden, seq_model, nb_layers, batchsize, out):
+@click.option('--dropout', default=0., help='dropout probability', required=False)
+@click.option('--stateful', default=False, help='True/False', required=False)
+def train(net, data, split, granularity, seq_length, hidden, seq_model, nb_layers, batchsize, out, dropout, stateful):
     T = seq_length # max seq length
     H = hidden  # hidden layer size
     E = hidden # embedding size
@@ -121,7 +123,9 @@ def train(net, data, split, granularity, seq_length, hidden, seq_model, nb_layer
         h = x
         for i in range(nb_layers):
             rs = False if i == nb_layers - 1 else True
-            h = SeqModel(H, stateful=False, init='orthogonal', return_sequences=rs)(h)
+            h = SeqModel(H, stateful=stateful, init='orthogonal', return_sequences=rs)(h)
+            if dropout > 0:
+                h = Dropout(dropout)(h)
         x = Dense(D)(h)
         pre_model = Model(input=xcur, output=x)
         x = Activation('softmax')(x)
@@ -132,7 +136,10 @@ def train(net, data, split, granularity, seq_length, hidden, seq_model, nb_layer
         xcur = Input(batch_shape=(batchsize, T), dtype='int32')
         x = Embedding(input_dim=D, output_dim=E, input_length=T)(xcur)
         for i in range(nb_layers):
-            h = SeqModel(H, stateful=True, init='orthogonal', return_sequences=True)(x)
+            h = SeqModel(H, stateful=stateful, init='orthogonal', return_sequences=True)(x)
+            if dropout > 0:
+                h = Dropout(dropout)(h)
+
         x = TimeDistributed(Dense(D))(h)
         pre_model = Model(input=xcur, output=x)
         x = Activation('softmax')(x)
@@ -204,48 +211,36 @@ def train(net, data, split, granularity, seq_length, hidden, seq_model, nb_layer
     def clean(s):
         return map(lambda w:'' if w in (0, 1) else w, s)
 
+    def show(gen, files):
+        for g in gen:
+            for fd in files:
+                g = clean(g)
+                s = ''.join(g)
+                fd.write('\n')
+                fd.write(s)
+                fd.write('\n')
+                fd.write('-'*min(80, len(s)))
+                fd.write('\n')
+
     def gen(epoch):
         if mode == 'rnn_next_char':
             def pred_func(gen):
                 return pre_model.predict_on_batch([gen])
             i = np.random.randint(0, len(inp[0]))
             cur = np.repeat(inp[0][i:i+1], batchsize, axis=0)
-            gen = generate_text(pred_func, v, cur=cur, nb=1, max_length=T * 100, rng=np.random, way='proba', temperature=1)
+            gen = generate_text(pred_func, v, cur=cur, nb=batchsize if stateful else 10, max_length=T * 20, rng=np.random, way='proba', temperature=1)
             fd = open(out, 'a')
-            for g in gen[0:1]:
-                g = clean(g)
-                s = ''.join(g)
-                print('\n')
-                print(s)
-                print('-' * len(s))
-                print('\n')
-
-                fd.write(s)
-                fd.write('\n')
-                fd.write('-'*len(s))
-
+            show(gen, [sys.stdout, fd])
             fd.close()
         if mode == 'rnn_next_chars':
             def pred_func(gen):
                 return pre_model.predict_on_batch([gen])[:, -1, :]
             i = np.random.randint(0, len(inp[0]))
             cur = np.repeat(inp[0][i:i+1], batchsize, axis=0)
-            gen = generate_text(pred_func, v, cur=cur, nb=batchsize, max_length=T * 100, rng=np.random, way='proba', temperature=1)
+            gen = generate_text(pred_func, v, cur=cur, nb=batchsize if stateful else 10, max_length=T * 20, rng=np.random, way='proba', temperature=1)
             fd = open(out, 'a')
-            for g in gen[0:10]:
-                g = clean(g)
-                s = ''.join(g)
-                print('\n')
-                print(s)
-                print('-' * len(s))
-                print('\n')
-
-                fd.write(s)
-                fd.write('\n')
-                fd.write('-'*len(s))
+            show(gen, [sys.stdout, fd])
             fd.close()
-
-
         if mode == 'rnn_skipthought':
             pass
         if mode in ('rnn_aa', 'conv_aa', 'dense_aa'):
@@ -318,14 +313,14 @@ def train(net, data, split, granularity, seq_length, hidden, seq_model, nb_layer
             loss = model.evaluate(x_mb_orig, y_mb, verbose=0, batch_size=batchsize)
             avg_loss = avg_loss * 0.999 + loss * 0.001
             nb += 1
-            if nb % 10 == 0 and mode != 'rnn_next_chars':
+            if nb % 100 == 0 and stateful is False:
                 gen(i)
         print('Full data pass time in sec : {}'.format(time.time() - t))
         print('avg loss : {}, nb updates : {}'.format(avg_loss, nb))
-        if i % 10 == 0:
+        if stateful:
             model.reset_states()
             gen(i)
-        model.reset_states()
+            model.reset_states()
 
 def categ(X, D=10):
     return np.array([to_categorical(x, nb_classes=D) for x in X])
