@@ -38,9 +38,10 @@ def generate(X, predict_fn, sample_fn=sample_multinomial):
 
 class ColorDiscretizer(object):
     
-    def __init__(self, centers):
+    def __init__(self, centers, batch_size=1000):
         # assume centers has shape (nb_centers, nb_channels)
         self.centers = np.array(centers)
+        self.batch_size = batch_size
     
     def fit(self, X, y=None):
         return self
@@ -50,10 +51,13 @@ class ColorDiscretizer(object):
         X = X[:, :, :, :, np.newaxis] #(nb_examples, nb_channels, h, w, 1)
         centers = self.centers.T # (nb_channels, nb_centers)
         centers = centers[np.newaxis, :, np.newaxis, np.newaxis, :]#(1, nb_channels, 1, 1, nb_centers)
-        dist = np.abs(X - centers) # (nb_examples, nb_channels, h, w, nb_centers)
-        dist = dist.sum(axis=1) # (nb_examples, h, w, nb_centers)
-        out = dist.argmin(axis=3) # (nb_examples, h, w)
-        return out
+        outputs = []
+        for i in range(0, len(X), self.batch_size):
+            dist = np.abs(X[i:i + self.batch_size] - centers) # (nb_examples, nb_channels, h, w, nb_centers)
+            dist = dist.sum(axis=1) # (nb_examples, h, w, nb_centers)
+            out = dist.argmin(axis=3) # (nb_examples, h, w)
+            outputs.append(out)
+        return np.concatenate(outputs, axis=0)
 
     def inverse_transform(self, X):
         # assume X has shape (nb_examples, h, w)
@@ -66,12 +70,13 @@ class ColorDiscretizer(object):
         return X
         
 def color_discretization(X, n_bins):
-    from sklearn.cluster import KMeans
+    from sklearn.cluster import KMeans, MiniBatchKMeans
+    kmeans = KMeans
     # assume X has shape (nb_examples, nb_colors, h, w)
     X = X.transpose((0, 2, 3, 1))
     nb, h, w, nb_colors = X.shape
     X = X.reshape((nb * h * w, nb_colors))
-    clus = KMeans(n_clusters=n_bins).fit(X)
+    clus = kmeans(n_clusters=n_bins).fit(X)
     return clus.cluster_centers_ # (n_bins, nb_colors)
 
 def categ(X, D=10):

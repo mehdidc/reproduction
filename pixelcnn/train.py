@@ -6,6 +6,7 @@ import theano.tensor as T
 
 from lasagne import objectives
 from lasagne import layers
+from lasagne.layers import batch_norm
 from lasagne.updates import adam
 from lasagne import nonlinearities
 
@@ -20,10 +21,10 @@ from helpers import ColorDiscretizer, color_discretization
 
 def run():
     batch_size = 128
-    train_X = load_data()
-    nb_channels = 4 # level of discretization
+    train_X = load_data('cifar')
+    nb_channels = 100 # level of discretization
     print('Discretizing...')
-    centers = color_discretization(train_X, nb_channels)
+    centers = color_discretization(train_X[0:10], nb_channels)
     print('Centers : {}'.format(centers))
 
     color_discretizater = ColorDiscretizer(centers=centers)
@@ -57,7 +58,6 @@ def run():
     
     train = theano.function([X], loss, updates=updates)
     predict = theano.function([X], y)
-    print(predict(train_X).shape)
     for epoch in range(10000):
         indices = np.arange(len(train_X))
         np.random.shuffle(indices)
@@ -73,7 +73,7 @@ def run():
             nb += len(x)
         avg_loss /= nb
         print('train loss: {}'.format(avg_loss))
-        if epoch % 100 == 0:
+        if epoch % 1 == 0:
             #x = predict(train_X[0:9])
             #x = x.argmax(axis=1)
             #x = color_discretizater.inverse_transform(x)
@@ -86,13 +86,11 @@ def run():
             x = disp(x, border=1, bordercolor=(1,0,0))
             imsave('out.png', x)
 
-def load_data():
-    from lasagnekit.datasets.mnist import MNIST
-    data = MNIST()
-    data.load()
-    X = data.X
-    X = X.reshape((X.shape[0], 1, 28, 28))
-    return X[0:100]
+def load_data(name='mnist'):
+    import datakit
+    module = getattr(datakit, name)
+    data = module.load()
+    return data['train']['X']
 
 if __name__ == '__main__':
     np.random.seed(42)
