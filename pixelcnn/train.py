@@ -19,24 +19,27 @@ from helpers import softmax
 from helpers import floatX
 from helpers import ColorDiscretizer, color_discretization
 
-def run():
+def get_some(iterator, nb=10):
+    vals = []
+    for _ in range(nb):
+        vals.append(next(iterator))
+    return np.array(vals)
+
+def run(data, folder='.'):
+    train_X = data
     batch_size = 128
-    train_X = load_data('cifar')
     nb_channels = 100 # level of discretization
     print('Discretizing...')
-    centers = color_discretization(train_X[0:10], nb_channels)
+    centers = color_discretization(train_X[0:100], nb_channels)
     print('Centers : {}'.format(centers))
 
     color_discretizater = ColorDiscretizer(centers=centers)
     color_discretizater.fit(train_X)
     train_X = color_discretizater.transform(train_X)
-
-    train_X = categ(train_X, D=nb_channels)
-    train_X = train_X.transpose((0, 3, 1, 2))
     
-    # train_X has shape (nb_examples, nb_channels, h, w)
+    # train_X has shape (nb_examples, h, w)
     print('data has shape : {}'.format(train_X.shape))
-    height, width = train_X.shape[2:]
+    height, width = train_X.shape[1:]
     input_shape = (None, nb_channels, height, width)
     inp, out = build_model_pixelcnn(
             input_shape=input_shape, 
@@ -68,30 +71,40 @@ def run():
         print('training...')
         for i in range(0, len(train_X), batch_size):
             x = train_X[i:i+batch_size]
+            x = categ(x, D=nb_channels)
+            x = x.transpose((0, 3, 1, 2))
             loss_x = train(x)
             avg_loss += loss_x * len(x)
             nb += len(x)
         avg_loss /= nb
         print('train loss: {}'.format(avg_loss))
         if epoch % 1 == 0:
-            #x = predict(train_X[0:9])
-            #x = x.argmax(axis=1)
-            #x = color_discretizater.inverse_transform(x)
-            #x = disp(x, border=1, bordercolor=(1,0,0))
-            #imsave('rec.png', x)
             print('generate...')
             x = np.zeros((100, nb_channels, height, width))
             x = generate(x, predict_fn=predict, sample_fn=sample_multinomial)
             x = color_discretizater.inverse_transform(x)
             x = disp(x, border=1, bordercolor=(1,0,0))
-            imsave('out.png', x)
-
-def load_data(name='mnist'):
-    import datakit
-    module = getattr(datakit, name)
-    data = module.load()
-    return data['train']['X']
+            imsave(folder+'/out.png', x)
 
 if __name__ == '__main__':
+    from docopt import docopt
+    from datakit.imagecollection import load
+    import glob
+    from itertools import imap
+    from itertools import cycle
+    from functools import partial
+    from skimage.transform import resize
+    doc = """
+    Usage: train.py PATTERN FOLDER
+    """
+    args = docopt(doc)
     np.random.seed(42)
-    run()
+    filelist = glob.glob(args['PATTERN'])
+    data = load(filelist, buffer_size=len(filelist))
+    data = imap(partial(resize, output_shape=(32, 32), preserve_range=True), data)
+    data = imap(lambda X:X.transpose((2, 0, 1)), data)
+    data = list(data)
+    data = np.array(data)
+    data = floatX(data)
+    print(data.shape)
+    run(data=data, folder=args['FOLDER'])
