@@ -62,7 +62,7 @@ def train():
     model_cls = Bogdan
     params = model_cls.params.keys()
 
-    model = instantiate_random_model(model_cls)
+    model = instantiate_default_model(model_cls)
     model = init_func(model)
 
     for param in params:
@@ -72,10 +72,11 @@ def train():
     def schedule(epoch, lr):
         return np.array(lr * model.decay, dtype="float32")
 
-    with open("/tmp/{}.json".format(uuid.uuid4()), "w") as fd:
+    name = uuid.uuid4()
+    with open("{}.json".format(name), "w") as fd:
         fd.write(model.model.to_json())
 
-    filename = "/tmp/{}.hdf5".format(uuid.uuid4())
+    filename = "{}.hdf5".format(name)
     checkpointer = ModelCheckpoint(filepath=filename,
                                    monitor="val_acc",
                                    verbose=1, save_best_only=True)
@@ -84,7 +85,8 @@ def train():
                      callbacks=[learning_rate_scheduler, checkpointer])
     for k, v in hist.history.items():
         light.set(k, v)
-    model.model.load_weights(filename)
+    model.model.save_weights(filename)
+    #model.model.load_weights(filename)
 
     test_error = classification_error(model, X_test, y_test)
     light.set("test_error", test_error)

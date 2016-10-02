@@ -15,7 +15,7 @@ optimization_params = dict(
         momentum=Param(initial=0.9, interval=[0.5, 0.99], type='real'),
         patience=make_constant_param(50),
         val_ratio=make_constant_param(0.15),
-        max_epochs=make_constant_param(500),
+        max_epochs=make_constant_param(200),
         batch_size=Param(initial=128, interval=[16, 32, 64, 128, 256, 512], type='choice'),
 )
 
@@ -31,10 +31,10 @@ class Base(Model):
             kwargs["validation_split"] = self.val_ratio
         else:
             kwargs["validation_data"] = validation_data
-        if "callbacks" in kwargs:
-            kwargs["callbacks"].append(early_stopping)
-        else:
-            kwargs["callbacks"] = [early_stopping]
+        #if "callbacks" in kwargs:
+        #    kwargs["callbacks"].append(early_stopping)
+        #else:
+        #    kwargs["callbacks"] = [early_stopping]
         return self.model.fit(X, y,
                               nb_epoch=self.max_epochs,
                               batch_size=self.batch_size,
@@ -48,7 +48,7 @@ class Base(Model):
         return self.model.predict_proba(X)
 
     def prepare_optimization_(self, model):
-        sgd = Adam(lr=self.lr, decay=self.decay)
+        sgd = Adam(lr=self.lr)
         model.compile(loss='categorical_crossentropy', optimizer=sgd)
         return model
 
@@ -126,7 +126,7 @@ class ConvModel(Base):
         conv_maxout(model,
                     self.nbpieces1,
                     0,
-                    self.nb_filters1 * self.nbpieces1, 
+                    self.nb_filters1 * self.nbpieces1,
                     self.conv1, self.conv1,
                     activation='relu',
                     input_shape=imshape)
@@ -138,27 +138,27 @@ class ConvModel(Base):
              model,
              self.nbpieces2,
              3,
-             self.nb_filters2 * self.nbpieces2, 
+             self.nb_filters2 * self.nbpieces2,
              self.conv2, self.conv2,
              activation='relu'
         )
         #model.add(BatchNormalization())
- 
-        model.add(MaxPooling2D(pool_size=(self.poolsize2, self.poolsize2), 
+
+        model.add(MaxPooling2D(pool_size=(self.poolsize2, self.poolsize2),
                  strides=(self.poolstride2, self.poolstride2)))
         conv_maxout(
              model,
              self.nbpieces3,
              3,
-             self.nb_filters3 * self.nbpieces3, 
+             self.nb_filters3 * self.nbpieces3,
              self.conv3, self.conv3,
              activation='relu'
         )
         #model.add(BatchNormalization())
 
         model.add(Dropout(0.5))
- 
-        model.add(MaxPooling2D(pool_size=(self.poolsize3, self.poolsize3), 
+
+        model.add(MaxPooling2D(pool_size=(self.poolsize3, self.poolsize3),
                   strides=(self.poolstride3, self.poolstride3)))
         model.add(Flatten())
         model.add(Dense(nb_outputs))
@@ -190,7 +190,7 @@ class Bogdan(Base):
         model.add(PReLU())
         model.add(MaxPooling2D((2, 2)))
         model.add(Dropout(0.5))
-        
+
         model.add(Convolution2D(k * 2, 3, 3, init=init))
         #model.add(BatchNormalization())
         #model.add(Activation(relu))
