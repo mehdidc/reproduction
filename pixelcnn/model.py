@@ -42,11 +42,11 @@ def masked_conv2d(layer,
         **kw)
     return layer
 
-def build_model_pixelcnn(input_shape=(None, 1, 32, 32), n_outputs=1):
+def build_model_pixelcnn(input_shape=(None, 1, 32, 32), nb_layers=4, n_outputs=1):
     inp = layers.InputLayer(input_shape)
     conv = inp
     conv = masked_conv2d(conv, 64, (7, 7), type='a', nonlinearity=rectify, pad='same')
-    for _ in range(4):
+    for _ in range(nb_layers):
         conv = masked_conv2d(conv, 64, (3, 3), type='b', nonlinearity=rectify, pad='same')
     conv = masked_conv2d(conv, 64, (1, 1), type='b', nonlinearity=rectify, pad='same')
     conv = masked_conv2d(conv, 64, (1, 1), type='b', nonlinearity=rectify, pad='same')

@@ -1,3 +1,4 @@
+import pandas as pd
 import numpy as np
 from skimage.io import imsave
 
@@ -19,16 +20,12 @@ from helpers import softmax
 from helpers import floatX
 from helpers import ColorDiscretizer, color_discretization
 
-def get_some(iterator, nb=10):
-    vals = []
-    for _ in range(nb):
-        vals.append(next(iterator))
-    return np.array(vals)
-
 def run(data, folder='.'):
     train_X = data
     batch_size = 128
     nb_channels = 100 # level of discretization
+    nb_layers = 8
+
     print('Discretizing...')
     centers = color_discretization(train_X[0:100], nb_channels)
     print('Centers : {}'.format(centers))
@@ -43,7 +40,8 @@ def run(data, folder='.'):
     input_shape = (None, nb_channels, height, width)
     inp, out = build_model_pixelcnn(
             input_shape=input_shape, 
-            n_outputs=nb_channels)
+            n_outputs=nb_channels,
+            nb_layers=nb_layers)
     out = layers.NonlinearityLayer(out, softmax)
     
     print('Nb of params : {}'.format(layers.count_params(out)))
@@ -61,11 +59,11 @@ def run(data, folder='.'):
     
     train = theano.function([X], loss, updates=updates)
     predict = theano.function([X], y)
+    losses = []
     for epoch in range(10000):
         indices = np.arange(len(train_X))
         np.random.shuffle(indices)
         train_X = train_X[indices]
-
         avg_loss = 0.
         nb = 0
         print('training...')
@@ -78,13 +76,15 @@ def run(data, folder='.'):
             nb += len(x)
         avg_loss /= nb
         print('train loss: {}'.format(avg_loss))
+        losses.append(avg_loss)
+        pd.Series(losses).to_csv(folder+'/loss.csv')
         if epoch % 1 == 0:
             print('generate...')
             x = np.zeros((100, nb_channels, height, width))
             x = generate(x, predict_fn=predict, sample_fn=sample_multinomial)
             x = color_discretizater.inverse_transform(x)
             x = disp(x, border=1, bordercolor=(1,0,0))
-            imsave(folder+'/out.png', x)
+            imsave(folder+'/out{:05d}.png'.format(epoch), x)
 
 if __name__ == '__main__':
     from docopt import docopt
@@ -107,4 +107,5 @@ if __name__ == '__main__':
     data = np.array(data)
     data = floatX(data)
     print(data.shape)
+
     run(data=data, folder=args['FOLDER'])
