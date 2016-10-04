@@ -24,19 +24,7 @@ def sample_multinomial(x, rng=np.random):
         out[i] = rng.choice(np.arange(len(p)), p=p)
     return out
 
-def generate(X, predict_fn, sample_fn=sample_multinomial):
-    X = floatX(X)
-    out = np.empty((X.shape[0],) + (X.shape[2:]), dtype='int32')
-    nb, nb_channels, h, w = X.shape
-    for y in range(h):
-        for x in range(w):
-            p = predict_fn(X)
-            sample = sample_fn(p[:, :, y, x])
-            X[:, :, y, x] = categ(sample, D=nb_channels)
-            out[:, y, x] = sample
-    return out
-
-class ColorDiscretizer(object):
+class ColorDiscretizerJoint(object):
     
     def __init__(self, centers, batch_size=1000):
         # assume centers has shape (nb_centers, nb_channels)
@@ -67,8 +55,58 @@ class ColorDiscretizer(object):
         nb_channels = X.shape[1]
         X = X.reshape((nb, h, w, nb_channels))
         X = X.transpose((0, 3, 1, 2))
+        return X # (nb_examples, nb_channels, h, w)
+
+class ColorDiscretizerPerChannel(object):
+    
+    def __init__(self, centers, batch_size=1000):
+        # assume centers has shape (nb_centers, nb_channels)
+        self.centers = np.array(centers)
+        self.batch_size = batch_size
+    
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        # assume X has shape (nb_examples, nb_channels, h, w)
+        out = np.empty_like(X)
+        nb_channels = X.shape[1]
+        for channel in range(nb_channels):
+            X = X[:, channel, :, :, np.newaxis] #(nb_examples, h, w, 1)
+            centers = self.centers[:, channel] # (nb_centers,)
+            centers = centers[np.newaxis, np.newaxis, np.newaxis, :]#(1, 1, 1, nb_centers)
+            outputs = []
+            for i in range(0, len(X), self.batch_size):
+                dist = np.abs(X[i:i + self.batch_size] - centers) # (nb_examples, h, w, nb_centers)
+                out[i:i + self.batch_size, channel, :, :] = dist.argmin(axis=3) # (nb_examples, h, w)
+        return out
+
+    def inverse_transform(self, X):
+        # assume X has shape (nb_examples, nb_channels, h, w)
+        X = X.astype(np.int32)
+        nb_examples, nb_channels, h, w = X.shape
+        out = np.empty_like(X)
+        for channel in range(nb_channels):
+            x = X[:, channel].flatten()
+            x = self.centers[:, channel][x]
+            x = x.reshape((nb_examples, h, w))
+            out[:, channel, :, :] = x
+        return out
+
+class ColorDiscretizerRound(object):
+
+    def __init__(self):
+        pass
+    
+    def fit(self, X):
+        return self
+
+    def transform(self, X):
+        return X.astype(np.int32)
+
+    def inverse_transform(self, X):
         return X
-        
+
 def color_discretization(X, n_bins, method='kmeans'):
     from sklearn.cluster import KMeans, MiniBatchKMeans
     kmeans = MiniBatchKMeans
@@ -80,6 +118,7 @@ def color_discretization(X, n_bins, method='kmeans'):
     return clus.cluster_centers_ # (n_bins, nb_colors)
 
 def categ(X, D=10):
+    X = X.astype('int32')
     nb = np.prod(X.shape)
     x = X.flatten()
     m = np.zeros((nb, D))
@@ -88,15 +127,10 @@ def categ(X, D=10):
     m = floatX(m)
     return m
 
-def softmax(x):
-    # x has shape (nb_examples, nb_channels, h, w)
-    nb, nb_channels, h, w = x.shape
-    x = x.transpose((0, 2, 3, 1))
-    x = x.reshape((nb * h * w, nb_channels))
-    x = T.nnet.softmax(x)
-    x = x.reshape((nb, h, w, nb_channels))
-    x = x.transpose((0, 3, 1, 2))
-    return x
+def softmax(x, axis=1):
+    e_x = T.exp(x - x.max(axis=axis, keepdims=True))
+    out = e_x / e_x.sum(axis=axis, keepdims=True)
+    return out
 
 def floatX(x):
     return np.array(x, dtype=theano.config.floatX)
