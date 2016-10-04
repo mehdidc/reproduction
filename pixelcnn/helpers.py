@@ -69,9 +69,9 @@ class ColorDiscretizer(object):
         X = X.transpose((0, 3, 1, 2))
         return X
         
-def color_discretization(X, n_bins):
+def color_discretization(X, n_bins, method='kmeans'):
     from sklearn.cluster import KMeans, MiniBatchKMeans
-    kmeans = KMeans
+    kmeans = MiniBatchKMeans
     # assume X has shape (nb_examples, nb_colors, h, w)
     X = X.transpose((0, 2, 3, 1))
     nb, h, w, nb_colors = X.shape
