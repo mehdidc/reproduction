@@ -19,17 +19,17 @@ from helpers import categ
 from helpers import softmax
 from helpers import floatX
 from helpers import ColorDiscretizerPerChannel, ColorDiscretizerRound, color_discretization, ColorDiscretizerJoint
+from helpers import random_crop
 
 def run(data, folder='.'):
     train_X = data
-    batch_size = 128
-    nb_layers = 4 
-
+    batch_size = 64
+    nb_layers = 2
     print('Discretizing...')
     use_centers = True # False if  you want it like the original paper
     joint_centers = True # False if you want it like the original paper
-    nb_centers = 4
     if use_centers:
+        nb_centers = 256
         centers = color_discretization(train_X[0:100], nb_centers)
         print('Centers : {}'.format(centers))
         if joint_centers:
@@ -51,10 +51,14 @@ def run(data, folder='.'):
     color_discretizer.fit(train_X)
     train_X = color_discretizer.transform(train_X)
     train_X = floatX(train_X)
-    print(train_X.shape)
+
     # train_X has shape (nb_examples, h, w)
     print('data has shape : {}'.format(train_X.shape))
-    
+
+    img = disp(color_discretizer.inverse_transform(train_X[0:100]), border=1, bordercolor=(1,0,0))
+    imsave(folder+'/real.png', img)
+ 
+     
     if joint_centers:
         height, width = train_X.shape[1:]
         nb_channels = nb_outputs
@@ -66,7 +70,7 @@ def run(data, folder='.'):
             input_shape=input_shape, 
             nb_outputs=nb_outputs,
             nb_layers=nb_layers,
-            dim=64,
+            dim=21,
             mask_channels=mask_channels)
     out = layers.NonlinearityLayer(out, softmax)
     
@@ -83,15 +87,14 @@ def run(data, folder='.'):
         loss = objectives.categorical_crossentropy(y_, X_).mean()
     else:
         X = T.tensor4() # (nb_examples, nb_channels, h, w)
-        y = layers.get_output(out, X / nb_outputs) # (nb_examples, nb_outputs, nb_channels, h, w)
-        
+        y = layers.get_output(out, X/255.) # (nb_examples, nb_outputs, nb_channels, h, w)
         X_ = X.transpose((0, 2, 3, 1)).flatten() #(nb_examples * h * w * nb_channels,)
         X_ = T.cast(X_, 'int32')
         y_ = y.transpose((0, 3, 4, 2, 1)).reshape((-1, nb_outputs)) # (nb_examples * h * w * nb_channels, nb_outputs)
         loss = objectives.categorical_crossentropy(y_, X_).mean()
 
     params = layers.get_all_params(out)
-    updates = adam(loss, learning_rate=1e-3, params=params)
+    updates = adam(loss, learning_rate=1e-4, params=params)
 
     print('compiling functions...')
     
@@ -120,10 +123,10 @@ def run(data, folder='.'):
         print('train duration : {:.5f}s'.format(dt))
         losses.append(avg_loss)
         pd.Series(losses).to_csv(folder+'/loss.csv')
-        if epoch % 1 == 0:
+        if epoch % 100 == 0:
             print('generate...')
             t = time.time()
-            x = np.zeros((100, nb_channels, height, width))
+            x = np.zeros((9, nb_channels, height, width))
             x = generate_fn(x, predict_fn=predict, sample_fn=sample_multinomial)
             x = color_discretizer.inverse_transform(x)
             x = disp(x, border=1, bordercolor=(1,0,0))
@@ -140,6 +143,7 @@ def generate(X, predict_fn, sample_fn=sample_multinomial):
             p = predict_fn(X)
             for channel in range(nb_channels):
                 sample = sample_fn(p[:, :, channel, y, x])
+                print(sample)
                 X[:, channel, y, x] = sample
                 out[:, channel, y, x] = sample
     return out
@@ -155,8 +159,6 @@ def generate_with_joint_colors(X, predict_fn, sample_fn=sample_multinomial):
             X[:, :, y, x] = categ(sample, D=nb_channels)
             out[:, y, x] = sample
     return out
-
-
 
 if __name__ == '__main__':
     from docopt import docopt
@@ -183,8 +185,10 @@ if __name__ == '__main__':
         random.shuffle(filelist)
         filelist = filelist[0:100]
         data = load(filelist, buffer_size=len(filelist))
-        data = imap(partial(resize, output_shape=(64, 64), preserve_range=True), data)
-        data = imap(lambda X:X.transpose((2, 0, 1)), data)
+        data = imap(lambda x:x if len(x.shape) == 3 else x[:, :, np.newaxis], data) # add a channel axis for grayscale images
+        data = imap(partial(resize, output_shape=(16, 16), preserve_range=True), data) # resize the images
+        #data = imap(partial(random_crop, shape=(8, 8)), data) # crop the images 
+        data = imap(lambda X:X.transpose((2, 0, 1)), data) # make the channel at the beginning (channels, h, w)
         data = list(data)
         data = np.array(data)
         data = floatX(data)

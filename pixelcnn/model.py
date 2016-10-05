@@ -1,12 +1,16 @@
 import numpy as np
 
 import theano
+import theano.tensor as T
 
 from lasagne import layers, nonlinearities, init
 
 from helpers import floatX
 
 rectify = nonlinearities.rectify
+#def rectify(x):
+#    return T.switch(x > floatX(0), x, floatX(0))
+
 sigmoid = nonlinearities.sigmoid
 linear = lambda x:x
 
@@ -18,7 +22,7 @@ def build_mask(shape, type='a', n_channels=1):
     m = np.zeros(shape)
     m[:, :, 0:h/2, :] = 1
     m[:, :, h/2, 0:w/2 + 1] = 1
-    if type == 'a' and n_channels:
+    if type == 'a':
         # disable center of the filter if mask type is 'a'
         m[:, :, h/2, w/2] = 0
         
@@ -36,8 +40,7 @@ def build_mask(shape, type='a', n_channels=1):
             for j in range(n_channels):
                 if i > j:
                     m[i::n_channels, j::n_channels, h/2, w/2] = 1.
-
-    elif type == 'b' and n_channels:
+    elif type == 'b':
         # so far all centers are one, make
         # zero all the forbidden ones
 
@@ -53,6 +56,29 @@ def build_mask(shape, type='a', n_channels=1):
                     m[i::n_channels, j::n_channels, h/2, w/2] = 0.
     return floatX(m)
 
+def build_mask2(shape, type='a', n_channels=1):
+    mask_type = type
+    output_dim, input_dim, filter_size, _ = shape 
+    mask = np.ones(
+        (output_dim, input_dim, filter_size, filter_size), 
+        dtype=theano.config.floatX
+    )
+    center = filter_size//2
+    for i in xrange(filter_size):
+        for j in xrange(filter_size):
+                if (j > center) or (j==center and i > center):
+                    mask[:, :, j, i] = 0.
+    for i in xrange(n_channels):
+        for j in xrange(n_channels):
+            if (mask_type=='a' and i >= j) or (mask_type=='b' and i > j):
+                mask[
+                    j::n_channels,
+                    i::n_channels,
+                    center,
+                    center
+                ] = 0.
+    return floatX(mask)
+
 def masked_conv2d(layer, 
                   num_filters, 
                   filter_size, 
@@ -63,7 +89,7 @@ def masked_conv2d(layer,
     shape = (num_filters, layer.output_shape[1]) + filter_size
     if hasattr(W, '__call__'):
         W = W(shape)
-    mask = build_mask((num_filters, shape[1]) + filter_size, type=type, n_channels=n_channels)
+    mask = build_mask2((num_filters, shape[1]) + filter_size, type=type, n_channels=n_channels)
     W = mask * theano.shared(W)
     layer = layers.Conv2DLayer(
         layer,

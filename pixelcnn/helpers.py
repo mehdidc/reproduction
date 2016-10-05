@@ -1,5 +1,6 @@
 import numpy as np
 from skimage.io import imsave
+from skimage.util import pad
 
 import theano
 import theano.tensor as T
@@ -18,7 +19,8 @@ def disp(x, **kw):
     return x
 
 def sample_multinomial(x, rng=np.random):
-    out = np.empty(len(x), dtype='int32')
+    out = np.empty(len(x))
+    out = intX(out)
     for i in range(len(x)):
         p = x[i]
         out[i] = rng.choice(np.arange(len(p)), p=p)
@@ -49,6 +51,7 @@ class ColorDiscretizerJoint(object):
 
     def inverse_transform(self, X):
         # assume X has shape (nb_examples, h, w)
+        X = intX(X)
         nb, h, w = X.shape
         X = X.flatten()
         X = self.centers[X]
@@ -83,7 +86,7 @@ class ColorDiscretizerPerChannel(object):
 
     def inverse_transform(self, X):
         # assume X has shape (nb_examples, nb_channels, h, w)
-        X = X.astype(np.int32)
+        X = intX(X)
         nb_examples, nb_channels, h, w = X.shape
         out = np.empty_like(X)
         for channel in range(nb_channels):
@@ -102,10 +105,10 @@ class ColorDiscretizerRound(object):
         return self
 
     def transform(self, X):
-        return X.astype(np.int32)
+        return intX(X)
 
     def inverse_transform(self, X):
-        return X
+        return intX(X)
 
 def color_discretization(X, n_bins, method='kmeans'):
     from sklearn.cluster import KMeans, MiniBatchKMeans
@@ -118,7 +121,7 @@ def color_discretization(X, n_bins, method='kmeans'):
     return clus.cluster_centers_ # (n_bins, nb_colors)
 
 def categ(X, D=10):
-    X = X.astype('int32')
+    X = intX(X)
     nb = np.prod(X.shape)
     x = X.flatten()
     m = np.zeros((nb, D))
@@ -134,3 +137,16 @@ def softmax(x, axis=1):
 
 def floatX(x):
     return np.array(x, dtype=theano.config.floatX)
+
+def intX(x):
+    return np.array(x, dtype='int32')
+
+def random_crop(X, shape=(8, 8), rng=np.random):
+    # assumes x is (h, w, nb_channels)
+    py, px = shape[0] / 2, shape[1] / 2
+    X_ = np.zeros((X.shape[0] + py * 2, X.shape[1] + px * 2, X.shape[2]))
+    x = rng.randint(py, X.shape[1])
+    y = rng.randint(px, X.shape[0])
+    X_[py:-py, px:-px, :] = X
+    X_ = X_[y - py:y + py, x- px:x + px]
+    return X_
