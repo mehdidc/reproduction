@@ -4,15 +4,14 @@ import theano
 import theano.tensor as T
 
 from lasagne import layers, nonlinearities, init
+from lasagne.layers import batch_norm
 
-from helpers import floatX
+from helpers import floatX, softmax
 
 rectify = nonlinearities.rectify
-#def rectify(x):
-#    return T.switch(x > floatX(0), x, floatX(0))
-
 sigmoid = nonlinearities.sigmoid
 linear = lambda x:x
+very_leaky_rectify = nonlinearities.very_leaky_rectify
 
 def build_mask(shape, type='a', n_channels=1):
     # Inspired by : https://github.com/igul222/pixel_rnn/blob/master/pixel_rnn.py
@@ -79,6 +78,9 @@ def build_mask2(shape, type='a', n_channels=1):
                 ] = 0.
     return floatX(mask)
 
+conv2d = layers.Conv2DLayer
+local2d = layers.local.LocallyConnected2DLayer
+
 def masked_conv2d(layer, 
                   num_filters, 
                   filter_size, 
@@ -113,10 +115,82 @@ def build_model_pixelcnn(input_shape=(None, 1, 32, 32), nb_layers=4, nb_outputs=
     out = layers.ReshapeLayer(conv, ([0], nb_outputs, nc, [2], [3]))
     return inp, out
 
+def equals_(x, y, eps=1e-8):
+    return T.abs_(x - y) <= eps
+
+def wta_spatial(X):
+    # From http://arxiv.org/pdf/1409.2752v2.pdf
+    # Introduce sparsity for each channel/feature map, for each
+    # feature map make all activations zero except the max
+    # This introduces a sparsity level dependent on the number
+    # of feature maps,
+    # for instance if we have 10 feature maps, the sparsity level
+    # is 1/10 = 10%
+    mask = (equals_(X, T.max(X, axis=(2, 3), keepdims=True))) * 1
+    return X * mask
+
+def wta_channel_strided(stride=2):
+
+    def apply_(X):
+        B, F = X.shape[0:2]
+        w, h = X.shape[2:]
+        X_ = X.reshape((B, F, w / stride, stride, h / stride, stride))
+        mask = equals_(X_, X_.max(axis=(1, 3, 5), keepdims=True)) * 1
+        mask = mask.reshape(X.shape)
+        return X * mask
+    return apply_
+
+def build_model_aa(input_shape=(None, 1, 32, 32), nb_layers=4, nb_outputs=1, dim=64, **kw):
+    nc = 1
+    inp = layers.InputLayer(input_shape)
+    conv = inp
+    for _ in range(nb_layers):
+        conv = conv2d(conv, dim * nc, (5, 5), nonlinearity=rectify)
+    conv = layers.NonlinearityLayer(conv, wta_spatial)
+    for i in range(nb_layers):
+        conv = conv2d(conv, dim * nc, (5, 5), nonlinearity=rectify, pad='full')
+    conv = conv2d(conv, nb_outputs * nc, (1, 1), W=init.GlorotUniform(), nonlinearity=linear)
+    out = layers.ReshapeLayer(conv, ([0], nb_outputs, nc, [2], [3]))
+    return inp, out
+
+def build_model_aa_vertebrate(input_shape=(None, 1, 32, 32), nb_layers=4, nb_outputs=1, dim=64, **kw):
+    inp = layers.InputLayer(input_shape)
+    conv = inp
+    outs = []
+    for i in range(nb_layers):
+        conv = conv2d(conv, dim, (5, 5), nonlinearity=rectify, pad='same')
+        if i == nb_layers - 1:
+            conv_sparse = layers.NonlinearityLayer(conv, linear)
+            r = 4 * (i + 1)
+            conv_out = conv2d(conv_sparse, nb_outputs, (r + 1, r +  1), W=init.GlorotUniform(), nonlinearity=linear, pad='same')
+            #conv_out = layers.NonlinearityLayer(conv_out, softmax)
+            outs.append(conv_out)
+            print(conv_out.output_shape)
+    out = layers.ElemwiseSumLayer(outs)
+    out = layers.ReshapeLayer(out, ([0], nb_outputs, 1, [2], [3]))
+    return inp, out
+
+def build_model_aa_vertebrate_2(input_shape=(None, 1, 32, 32), nb_layers=4, nb_outputs=1, dim=64, **kw):
+    inp = layers.InputLayer(input_shape)
+    conv = inp
+    outs = []
+    for i in range(nb_layers):
+        conv = conv2d(conv, dim, (5, 5), nonlinearity=rectify, pad='same')
+        if i == nb_layers - 1:
+            conv_sparse = layers.NonlinearityLayer(conv, linear)
+            r = 4 * (i + 1)
+            conv_out = conv2d(conv_sparse, nb_outputs, (r + 1, r +  1), W=W, nonlinearity=linear, pad='same')
+            outs.append(conv_out)
+            print(conv_out.output_shape)
+    out = layers.ElemwiseSumLayer(outs)
+    out = layers.ReshapeLayer(out, ([0], nb_outputs, 1, [2], [3]))
+    return inp, out
+
+
 if __name__ == '__main__':
     import theano
     import theano.tensor as T
-    inp, out = build_model_pixelcnn(input_shape=(None, 3, 32, 32), nb_layers=4, n_outputs=256)
+    inp, out = build_model_aa(input_shape=(None, 3, 32, 32), nb_layers=4, nb_outputs=256)
     X = T.tensor4()
     y = layers.get_output(out, X)
     fn = theano.function([X], y)

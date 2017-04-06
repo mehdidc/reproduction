@@ -33,6 +33,7 @@ def train():
 
     data = dataset()
     data.load()
+    data.X = data.X.reshape((data.X.shape[0], 1, 28, 28))
     img_dim = data.img_dim
     if len(img_dim) == 2:
         img_dim = [1] + list(img_dim)
@@ -87,8 +88,8 @@ def train():
         light.set(k, v)
     model.model.save_weights(filename)
     #model.model.load_weights(filename)
-
     test_error = classification_error(model, X_test, y_test)
+    print(test_error)
     light.set("test_error", test_error)
     light.endings()
     light.store_experiment()

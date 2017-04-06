@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 from skimage.io import imsave
 from skimage.util import pad
@@ -9,6 +11,10 @@ from lasagne import objectives
 from lasagne import layers
 from lasagne.updates import adam
 from lasagne import nonlinearities
+
+def mkdir_path(path):
+    if not os.access(path, os.F_OK):
+        os.makedirs(path)
 
 def disp(x, **kw):
     # x shape : (examples, color, h, w)
@@ -74,14 +80,14 @@ class ColorDiscretizerPerChannel(object):
         # assume X has shape (nb_examples, nb_channels, h, w)
         out = np.empty_like(X)
         nb_channels = X.shape[1]
-        for channel in range(nb_channels):
-            X = X[:, channel, :, :, np.newaxis] #(nb_examples, h, w, 1)
-            centers = self.centers[:, channel] # (nb_centers,)
-            centers = centers[np.newaxis, np.newaxis, np.newaxis, :]#(1, 1, 1, nb_centers)
-            outputs = []
-            for i in range(0, len(X), self.batch_size):
-                dist = np.abs(X[i:i + self.batch_size] - centers) # (nb_examples, h, w, nb_centers)
-                out[i:i + self.batch_size, channel, :, :] = dist.argmin(axis=3) # (nb_examples, h, w)
+        X = X[:, :, :, :, np.newaxis] #(nb_examples, nb_channels, h, w, 1)
+        centers = self.centers # (nb_centers, nb_channels)
+        centers = centers.T # (nb_channels, nb_centers)
+        centers = centers[np.newaxis, :, np.newaxis, np.newaxis, :] #(1, nb_channels, 1, 1, nb_centers) 
+        outputs = []
+        for i in range(0, len(X), self.batch_size):
+            dist = np.abs(X[i:i + self.batch_size] - centers) # (nb_examples, nb_channels, h, w, nb_centers)
+            out[i:i + self.batch_size, :, :, :] = dist.argmin(axis=4) # (nb_examples, nb_channels, h, w)
         return out
 
     def inverse_transform(self, X):
@@ -89,6 +95,7 @@ class ColorDiscretizerPerChannel(object):
         X = intX(X)
         nb_examples, nb_channels, h, w = X.shape
         out = np.empty_like(X)
+        out = floatX(out)
         for channel in range(nb_channels):
             x = X[:, channel].flatten()
             x = self.centers[:, channel][x]
@@ -130,8 +137,8 @@ def categ(X, D=10):
     m = floatX(m)
     return m
 
-def softmax(x, axis=1):
-    e_x = T.exp(x - x.max(axis=axis, keepdims=True))
+def softmax(x, axis=1, backend=T):
+    e_x = backend.exp(x - x.max(axis=axis, keepdims=True))
     out = e_x / e_x.sum(axis=axis, keepdims=True)
     return out
 

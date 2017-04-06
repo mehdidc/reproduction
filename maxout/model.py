@@ -180,8 +180,8 @@ class Bogdan(Base):
         #init = 'he_normal'
         init = 'glorot_uniform'
         model = Sequential()
-        model.add(Reshape(imshape, input_shape=[nb_features]))
-        model.add(ZeroPadding2D(padding=(1, 1)))
+        #model.add(Reshape(imshape, input_shape=[nb_features]))
+        model.add(ZeroPadding2D(padding=(1, 1), input_shape=imshape))
 
         k = self.nb_filters_init
         model.add(Convolution2D(k, 3, 3, init=init))
